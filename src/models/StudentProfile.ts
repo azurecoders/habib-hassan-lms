@@ -16,6 +16,7 @@ export interface IStudentProfile extends Document {
   bloodGroup?: string;
   address?: string;
   status: "ACTIVE" | "INACTIVE" | "GRADUATED" | "TRANSFERRED";
+  avatarUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -96,6 +97,10 @@ const StudentProfileSchema = new Schema<IStudentProfile>(
       enum: ["ACTIVE", "INACTIVE", "GRADUATED", "TRANSFERRED"],
       default: "ACTIVE",
       index: true,
+    },
+    avatarUrl: {
+      type: String,
+      default: "",
     },
   },
   {

@@ -1,116 +1,192 @@
-import React from "react";
-import { getSession } from "@/lib/auth";
-import { CheckCircle2, Receipt, Download, User } from "lucide-react";
+"use client";
 
-export default async function ParentFeesPage() {
-  const session = await getSession();
+import React, { useEffect, useState } from "react";
+import { CheckCircle2, Receipt, Download, User, Loader2, AlertCircle } from "lucide-react";
 
-  const mockChildInvoices = [
-    {
-      invoiceNumber: "INV-2026-8812-1",
-      studentName: "Leo Miller",
-      grade: "Grade 10-A",
-      month: "November 2026",
-      totalAmount: 2500,
-      paidAmount: 2500,
-      dueDate: "2026-11-15",
-      status: "PAID",
-      heads: [
-        { name: "Monthly Tuition Fee", amount: 2000 },
-        { name: "Science Lab Fee", amount: 300 },
-        { name: "Library & Sports", amount: 200 },
-      ],
-    },
-    {
-      invoiceNumber: "INV-2026-7641-1",
-      studentName: "Leo Miller",
-      grade: "Grade 10-A",
-      month: "October 2026",
-      totalAmount: 2500,
-      paidAmount: 2500,
-      dueDate: "2026-10-15",
-      status: "PAID",
-      heads: [
-        { name: "Monthly Tuition Fee", amount: 2000 },
-        { name: "Science Lab Fee", amount: 300 },
-        { name: "Library & Sports", amount: 200 },
-      ],
-    },
-  ];
+interface FeeHead {
+  name: string;
+  amount: number;
+}
+
+interface StudentInInvoice {
+  admissionNumber: string;
+  rollNumber: string;
+  sectionName: string;
+  userId?: { name: string };
+}
+
+interface InvoiceItem {
+  _id: string;
+  invoiceNumber: string;
+  month: string;
+  totalAmount: number;
+  paidAmount: number;
+  dueDate: string;
+  status: "PAID" | "UNPAID" | "PARTIAL" | "OVERDUE";
+  heads: FeeHead[];
+  classId?: { name: string };
+  studentId?: StudentInInvoice;
+}
+
+export default function ParentFeesPage() {
+  const [loading, setLoading] = useState(true);
+  const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadInvoices() {
+      try {
+        const res = await fetch("/api/admin/school/fees/invoices");
+        const data = await res.json();
+        if (!ignore && data.success && Array.isArray(data.invoices)) {
+          setInvoices(data.invoices);
+        }
+      } catch (err) {
+        console.error("Failed to load child fee vouchers:", err);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+    loadInvoices();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const totalPaid = invoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+  const totalDue = invoices
+    .filter((inv) => inv.status !== "PAID")
+    .reduce((sum, inv) => sum + (inv.totalAmount - (inv.paidAmount || 0)), 0);
+  const unpaidCount = invoices.filter((inv) => inv.status !== "PAID").length;
+
+  const firstStudent = invoices.length > 0 ? invoices[0].studentId : null;
+  const firstClass = invoices.length > 0 ? invoices[0].classId : null;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Student Fee Vouchers & Receipts</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Child Fee Vouchers & Receipts</h1>
           <p className="text-sm text-slate-500">
-            Monitor and download fee slips for enrolled dependents of {session?.name}.
+            Monitor and track tuition vouchers and payment settlement history for your enrolled dependents.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold">
-          <User className="w-4 h-4 text-amber-500" />
-          <span>Child: Leo Miller (Grade 10-A)</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400">Total Dues</span>
-          <div className="flex items-center gap-2 mt-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-            <p className="text-xl font-bold text-emerald-600">$0.00 Due</p>
+        {firstStudent && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold shadow-2xs">
+            <User className="w-4 h-4 text-amber-500" />
+            <span>
+              {firstStudent.userId?.name || "Student"} ({firstClass?.name || "Class"} - Sec {firstStudent.sectionName})
+            </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Account in good standing</p>
-        </div>
-
-        <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400">Next Due Date</span>
-          <p className="text-xl font-bold mt-2">Dec 15, 2026</p>
-          <p className="text-xs text-slate-400 mt-1">December Fee Cycle</p>
-        </div>
-
-        <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400">Total Paid (YTD)</span>
-          <p className="text-xl font-bold text-blue-600 mt-2">$5,000</p>
-          <p className="text-xs text-slate-400 mt-1">All receipts cleared</p>
-        </div>
+        )}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs">
-        <h2 className="font-bold text-sm mb-4">Fee Vouchers & Payment History</h2>
-        <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-          {mockChildInvoices.map((inv) => (
-            <div key={inv.invoiceNumber} className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Receipt className="w-4 h-4 text-blue-600" />
-                  <span className="font-bold text-slate-900 dark:text-white">{inv.month}</span>
-                  <span className="font-mono text-slate-400 text-[11px]">({inv.invoiceNumber})</span>
+      {loading ? (
+        <div className="p-16 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-3" />
+          <p className="text-xs font-medium text-slate-500">Loading dependent fee vouchers...</p>
+        </div>
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <span className="text-xs uppercase font-semibold text-slate-400">Total Dues</span>
+              {totalDue === 0 ? (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <p className="text-xl font-extrabold text-emerald-600">$0.00 Outstanding</p>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">Account in good standing</p>
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-slate-500 text-[11px]">
-                  <span>Total: ${inv.totalAmount}</span>
-                  <span>• Paid: ${inv.paidAmount}</span>
-                  <span>• Due Date: {inv.dueDate}</span>
+              ) : (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-500" />
+                    <p className="text-xl font-extrabold text-amber-600">${totalDue.toLocaleString()} Due</p>
+                  </div>
+                  <p className="text-xs text-amber-600/80 mt-1">{unpaidCount} pending voucher(s)</p>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  {inv.status}
-                </span>
-                <button
-                  type="button"
-                  className="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium flex items-center gap-1"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Voucher</span>
-                </button>
-              </div>
+              )}
             </div>
-          ))}
-        </div>
-      </div>
+
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <span className="text-xs uppercase font-semibold text-slate-400">Total Invoices</span>
+              <p className="text-xl font-extrabold text-slate-900 dark:text-white mt-2">
+                {invoices.length} Vouchers
+              </p>
+              <p className="text-xs text-slate-400 mt-1">Generated this academic term</p>
+            </div>
+
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <span className="text-xs uppercase font-semibold text-slate-400">Total Settled (YTD)</span>
+              <p className="text-xl font-extrabold text-blue-600 mt-2">${totalPaid.toLocaleString()}</p>
+              <p className="text-xs text-slate-400 mt-1">Receipts verified</p>
+            </div>
+          </div>
+
+          {/* Vouchers Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xs">
+            <h2 className="font-bold text-sm mb-4 text-slate-900 dark:text-white">Fee Vouchers & Payment History</h2>
+
+            {invoices.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                <Receipt className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                No fee vouchers issued for your ward yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                {invoices.map((inv) => (
+                  <div
+                    key={inv._id}
+                    className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Receipt className="w-4 h-4 text-blue-600" />
+                        <span className="font-bold text-slate-900 dark:text-white">{inv.month}</span>
+                        <span className="font-mono text-slate-400 text-[11px]">
+                          ({inv.invoiceNumber})
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-slate-500 text-[11px]">
+                        <span>Total: <strong>${inv.totalAmount}</strong></span>
+                        <span>• Paid: <strong>${inv.paidAmount}</strong></span>
+                        {inv.dueDate && (
+                          <span>
+                            • Due: {new Date(inv.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </span>
+                        )}
+                        {inv.heads && inv.heads.length > 0 && (
+                          <span className="text-slate-400">
+                            ({inv.heads.map((h) => `${h.name}: $${h.amount}`).join(", ")})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          inv.status === "PAID"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : inv.status === "PARTIAL"
+                            ? "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300"
+                            : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300"
+                        }`}
+                      >
+                        {inv.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

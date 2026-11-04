@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/db";
 import FeeInvoice from "@/models/FeeInvoice";
+import StudentProfile from "@/models/StudentProfile";
 import { getSession } from "@/lib/auth";
 
 export async function GET(req: Request) {
@@ -18,9 +19,24 @@ export async function GET(req: Request) {
     await connectToDatabase();
 
     const query: Record<string, unknown> = { schoolId: session.schoolId };
-    if (classId && classId !== "ALL") query.classId = classId;
-    if (status && status !== "ALL") query.status = status;
-    if (month) query.month = month;
+
+    if (session.role === "STUDENT") {
+      const sp = await StudentProfile.findOne({ userId: session.id }).lean();
+      if (!sp) {
+        return NextResponse.json({ success: true, invoices: [] });
+      }
+      query.studentId = sp._id;
+    } else if (session.role === "PARENT") {
+      const sp = await StudentProfile.findOne({ guardianId: session.id }).lean();
+      if (!sp) {
+        return NextResponse.json({ success: true, invoices: [] });
+      }
+      query.studentId = sp._id;
+    } else {
+      if (classId && classId !== "ALL") query.classId = classId;
+      if (status && status !== "ALL") query.status = status;
+      if (month) query.month = month;
+    }
 
     const invoices = await FeeInvoice.find(query)
       .populate({

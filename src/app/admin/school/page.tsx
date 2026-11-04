@@ -6,6 +6,7 @@ import StudentProfile from "@/models/StudentProfile";
 import StaffProfile from "@/models/StaffProfile";
 import FeeInvoice from "@/models/FeeInvoice";
 import Notice from "@/models/Notice";
+import Attendance from "@/models/Attendance";
 import { Types } from "mongoose";
 import {
   GraduationCap,
@@ -22,10 +23,11 @@ import {
 export default async function SchoolAdminDashboardPage() {
   const session = await getSession();
 
-  let studentCount = 120;
-  let staffCount = 14;
-  let totalBilled = 18500;
-  let totalCollected = 14500;
+  let studentCount = 0;
+  let staffCount = 0;
+  let totalBilled = 0;
+  let totalCollected = 0;
+  let todayAttendanceStr = "Pending";
   let recentNotices: Array<{
     _id: string;
     title: string;
@@ -38,8 +40,9 @@ export default async function SchoolAdminDashboardPage() {
     if (session?.schoolId) {
       await connectToDatabase();
       const sId = new Types.ObjectId(session.schoolId);
+      const today = new Date().toISOString().split("T")[0];
 
-      const [sCount, stCount, invoiceAgg, noticesList] = await Promise.all([
+      const [sCount, stCount, invoiceAgg, todayAttendance, noticesList] = await Promise.all([
         StudentProfile.countDocuments({ schoolId: sId }),
         StaffProfile.countDocuments({ schoolId: sId }),
         FeeInvoice.aggregate([
@@ -52,15 +55,32 @@ export default async function SchoolAdminDashboardPage() {
             },
           },
         ]),
+        Attendance.find({ schoolId: sId, date: today }).lean(),
         Notice.find({ schoolId: sId }).sort({ createdAt: -1 }).limit(3).lean(),
       ]);
 
-      if (sCount > 0) studentCount = sCount;
-      if (stCount > 0) staffCount = stCount;
+      studentCount = sCount;
+      staffCount = stCount;
+
       if (invoiceAgg.length > 0) {
         totalBilled = invoiceAgg[0].totalBilled || 0;
         totalCollected = invoiceAgg[0].totalPaid || 0;
       }
+
+      if (todayAttendance.length > 0) {
+        let totalRecs = 0;
+        let presentRecs = 0;
+        for (const sheet of todayAttendance) {
+          for (const r of sheet.records) {
+            totalRecs++;
+            if (r.status === "PRESENT") presentRecs++;
+          }
+        }
+        if (totalRecs > 0) {
+          todayAttendanceStr = `${Math.round((presentRecs / totalRecs) * 100)}%`;
+        }
+      }
+
       if (noticesList.length > 0) {
         recentNotices = noticesList.map((n) => ({
           _id: n._id.toString(),
@@ -75,7 +95,7 @@ export default async function SchoolAdminDashboardPage() {
     console.error("Dashboard fetch error:", err);
   }
 
-  const collectionRate = totalBilled > 0 ? ((totalCollected / totalBilled) * 100).toFixed(0) : "100";
+  const collectionRate = totalBilled > 0 ? ((totalCollected / totalBilled) * 100).toFixed(0) : "0";
 
   return (
     <div className="space-y-6">
@@ -109,52 +129,58 @@ export default async function SchoolAdminDashboardPage() {
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Enrolled Students</span>
             <GraduationCap className="w-4 h-4 text-blue-500" />
           </div>
-          <p className="text-2xl font-bold mt-2">{studentCount}</p>
+          <p className="text-2xl font-bold mt-2 text-slate-900 dark:text-white">{studentCount}</p>
           <p className="text-xs text-slate-400 mt-1">Active registered learners</p>
         </div>
 
-        <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Faculty & Staff</span>
             <Users className="w-4 h-4 text-emerald-500" />
           </div>
-          <p className="text-2xl font-bold mt-2">{staffCount}</p>
+          <p className="text-2xl font-bold mt-2 text-slate-900 dark:text-white">{staffCount}</p>
           <p className="text-xs text-slate-400 mt-1">Teachers & personnel</p>
         </div>
 
-        <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Today&apos;s Attendance</span>
             <CalendarCheck className="w-4 h-4 text-amber-500" />
           </div>
-          <p className="text-2xl font-bold mt-2 text-emerald-600">96.4%</p>
-          <p className="text-xs text-slate-400 mt-1">Average institutional presence</p>
+          <p className="text-2xl font-bold mt-2 text-emerald-600">{todayAttendanceStr}</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {todayAttendanceStr === "Pending" ? "Roll calls not yet completed" : "Today's presence percentage"}
+          </p>
         </div>
 
-        <div className="p-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Fee Collection</span>
             <CreditCard className="w-4 h-4 text-indigo-500" />
           </div>
-          <p className="text-2xl font-bold mt-2">${totalCollected.toLocaleString()}</p>
-          <p className="text-xs text-emerald-600 mt-1">{collectionRate}% of ${totalBilled.toLocaleString()}</p>
+          <p className="text-2xl font-bold mt-2 text-slate-900 dark:text-white">
+            ${totalCollected.toLocaleString()}
+          </p>
+          <p className="text-xs text-emerald-600 mt-1">
+            {totalBilled > 0 ? `${collectionRate}% of $${totalBilled.toLocaleString()}` : "$0 total billed"}
+          </p>
         </div>
       </div>
 
       {/* Quick Launchpad & Modules */}
       <div>
-        <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-3">
+        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
           Quick Modules & Workflows
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             href="/admin/school/attendance"
-            className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 shadow-2xs transition group"
+            className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 shadow-2xs transition group"
           >
             <div className="flex items-center justify-between">
               <CalendarCheck className="w-5 h-5 text-blue-500" />
@@ -166,7 +192,7 @@ export default async function SchoolAdminDashboardPage() {
 
           <Link
             href="/admin/school/fees"
-            className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-2xs transition group"
+            className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-2xs transition group"
           >
             <div className="flex items-center justify-between">
               <CreditCard className="w-5 h-5 text-emerald-500" />
@@ -178,7 +204,7 @@ export default async function SchoolAdminDashboardPage() {
 
           <Link
             href="/admin/school/exams"
-            className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-purple-400 dark:hover:border-purple-600 shadow-2xs transition group"
+            className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-purple-400 dark:hover:border-purple-600 shadow-2xs transition group"
           >
             <div className="flex items-center justify-between">
               <FileSpreadsheet className="w-5 h-5 text-purple-500" />
@@ -190,7 +216,7 @@ export default async function SchoolAdminDashboardPage() {
 
           <Link
             href="/admin/school/academics"
-            className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-600 shadow-2xs transition group"
+            className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-600 shadow-2xs transition group"
           >
             <div className="flex items-center justify-between">
               <BookOpen className="w-5 h-5 text-amber-500" />
@@ -203,7 +229,7 @@ export default async function SchoolAdminDashboardPage() {
       </div>
 
       {/* Recent Notices Preview */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-2xs">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xs">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <Bell className="w-4 h-4 text-blue-500" />
@@ -218,7 +244,7 @@ export default async function SchoolAdminDashboardPage() {
         </div>
 
         {recentNotices.length === 0 ? (
-          <p className="text-xs text-slate-400 py-3 text-center">
+          <p className="text-xs text-slate-400 py-4 text-center">
             No notices posted yet. Use &quot;Broadcast Notice&quot; above to publish announcements.
           </p>
         ) : (
@@ -226,7 +252,7 @@ export default async function SchoolAdminDashboardPage() {
             {recentNotices.map((n) => (
               <div
                 key={n._id}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800"
+                className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800"
               >
                 <div className="flex items-center gap-3">
                   <span

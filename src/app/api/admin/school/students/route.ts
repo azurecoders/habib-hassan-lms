@@ -59,6 +59,7 @@ export async function POST(req: Request) {
       guardianName,
       guardianEmail,
       guardianPhone,
+      avatarUrl,
     } = body;
 
     if (!name || !email || !admissionNumber || !rollNumber || !classId || !sectionName) {
@@ -138,6 +139,7 @@ export async function POST(req: Request) {
       gender: gender || "MALE",
       bloodGroup: bloodGroup || "",
       address: address || "",
+      avatarUrl: avatarUrl || "",
       status: "ACTIVE",
     });
 

@@ -1,5 +1,12 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
+export interface IAssignedClass {
+  _id?: Types.ObjectId;
+  classId: Types.ObjectId;
+  sectionName: string;
+  subjectId: Types.ObjectId;
+}
+
 export interface IStaffProfile extends Document {
   schoolId: Types.ObjectId;
   userId: Types.ObjectId;
@@ -9,10 +16,33 @@ export interface IStaffProfile extends Document {
   qualification: string;
   joiningDate: Date;
   salary?: number;
+  avatarUrl?: string;
+  assignedClasses: IAssignedClass[];
   status: "ACTIVE" | "ON_LEAVE" | "RESIGNED";
   createdAt: Date;
   updatedAt: Date;
 }
+
+const AssignedClassSchema = new Schema<IAssignedClass>(
+  {
+    classId: {
+      type: Schema.Types.ObjectId,
+      ref: "SchoolClass",
+      required: true,
+    },
+    sectionName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    subjectId: {
+      type: Schema.Types.ObjectId,
+      ref: "Subject",
+      required: true,
+    },
+  },
+  { _id: true }
+);
 
 const StaffProfileSchema = new Schema<IStaffProfile>(
   {
@@ -55,6 +85,14 @@ const StaffProfileSchema = new Schema<IStaffProfile>(
     salary: {
       type: Number,
       default: 0,
+    },
+    avatarUrl: {
+      type: String,
+      default: "",
+    },
+    assignedClasses: {
+      type: [AssignedClassSchema],
+      default: [],
     },
     status: {
       type: String,

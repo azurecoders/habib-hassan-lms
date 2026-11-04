@@ -10,6 +10,9 @@ import {
   ArrowRight,
   Database,
   KeyRound,
+  ShieldCheck,
+  Building2,
+  Users,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -17,9 +20,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [seedSuccess, setSeedSuccess] = useState<string | null>(null);
 
   const handleLogin = async (e?: React.FormEvent, customEmail?: string, customPass?: string) => {
     if (e) e.preventDefault();
@@ -51,89 +52,53 @@ export default function LoginPage() {
     }
   };
 
-  const handleSeedDatabase = async () => {
-    setSeeding(true);
-    setSeedSuccess(null);
-    setError(null);
-    try {
-      const res = await fetch("/api/seed");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to seed database");
-      setSeedSuccess("Demo school and 5 user roles initialized successfully!");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Database seeding failed";
-      setError(msg);
-    } finally {
-      setSeeding(false);
-    }
-  };
-
-  const quickRoles = [
+  const adminCredentials = [
     {
-      role: "SaaS Super Admin",
+      title: "SaaS Super Admin",
       email: "superadmin@lms.com",
-      badge: "Platform Admin",
-      color: "border-purple-200 hover:border-purple-400 dark:border-purple-900",
+      role: "Platform Super Admin",
+      desc: "Manage all tenant schools, billing plans, and SaaS platform health.",
+      icon: ShieldCheck,
+      color: "border-purple-200 hover:border-purple-400 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20",
+      textColor: "text-purple-600 dark:text-purple-400",
     },
     {
-      role: "Institution Admin",
+      title: "School Principal / Admin",
       email: "principal@apex.edu",
-      badge: "School Principal",
-      color: "border-blue-200 hover:border-blue-400 dark:border-blue-900",
-    },
-    {
-      role: "Teacher",
-      email: "teacher@apex.edu",
-      badge: "Faculty",
-      color: "border-emerald-200 hover:border-emerald-400 dark:border-emerald-900",
-    },
-    {
-      role: "Parent",
-      email: "parent@apex.edu",
-      badge: "Guardian",
-      color: "border-amber-200 hover:border-amber-400 dark:border-amber-900",
-    },
-    {
-      role: "Student",
-      email: "student@apex.edu",
-      badge: "Learner",
-      color: "border-indigo-200 hover:border-indigo-400 dark:border-indigo-900",
+      role: "Apex International Academy",
+      desc: "Manage academics, admit students, assign teachers, and view finances.",
+      icon: Building2,
+      color: "border-blue-200 hover:border-blue-400 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20",
+      textColor: "text-blue-600 dark:text-blue-400",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-blue-500 selection:text-white">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex p-3 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/20 mb-4">
-          <GraduationCap className="w-8 h-8" />
+        <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-500/20">
+          <GraduationCap className="w-7 h-7" />
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Multi-Tenant School Management
+        <h2 className="mt-4 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          Sign In to Your Portal
         </h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Sign in to access your institutional portal
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Access your institution workspace, grading desk, or learner portal
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
-        <div className="bg-white dark:bg-slate-900 py-8 px-6 shadow-xl rounded-2xl border border-slate-200/80 dark:border-slate-800 sm:px-10">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white dark:bg-slate-900 py-8 px-6 shadow-xl shadow-slate-200/50 dark:shadow-none sm:rounded-2xl border border-slate-200 dark:border-slate-800 space-y-6">
           {error && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-sm flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0" />
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{error}</span>
             </div>
           )}
 
-          {seedSuccess && (
-            <div className="mb-5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>{seedSuccess}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={(e) => handleLogin(e)} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Email Address
               </label>
               <input
@@ -141,13 +106,13 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@school.edu"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                placeholder="you@institution.edu"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-hidden transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Password
               </label>
               <input
@@ -155,72 +120,83 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                placeholder="••••••••••••"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-hidden transition"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-60 cursor-pointer"
+              className="w-full mt-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition disabled:opacity-60 cursor-pointer"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in to Dashboard"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 
-          {/* Quick Demo Section */}
-          <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  1-Click Role Login (Testing)
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleSeedDatabase}
-                disabled={seeding}
-                className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1 font-medium hover:underline"
-              >
-                {seeding ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Database className="w-3.5 h-3.5" />
-                )}
-                Seed Demo DB
-              </button>
+          {/* Quick One-Click Admin Credentials */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2.5">
+              1-Click Administrator Access:
+            </span>
+            <div className="space-y-2">
+              {adminCredentials.map((c) => {
+                const Icon = c.icon;
+                return (
+                  <button
+                    key={c.email}
+                    type="button"
+                    onClick={() => {
+                      setEmail(c.email);
+                      setPassword("password123");
+                      handleLogin(undefined, c.email, "password123");
+                    }}
+                    className={`w-full text-left p-3 rounded-xl border transition flex items-start justify-between cursor-pointer ${c.color}`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-white dark:bg-slate-800 shadow-2xs mt-0.5">
+                        <Icon className={`w-4 h-4 ${c.textColor}`} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs text-slate-900 dark:text-white">
+                            {c.title}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                          {c.email} • password123
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 shrink-0 self-center">
+                      Auto-fill →
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {quickRoles.map((qr) => (
-                <button
-                  key={qr.email}
-                  type="button"
-                  onClick={() => {
-                    setEmail(qr.email);
-                    setPassword("password123");
-                    handleLogin(undefined, qr.email, "password123");
-                  }}
-                  disabled={loading}
-                  className={`p-2.5 text-left rounded-lg border bg-slate-50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 transition-all flex items-center justify-between ${qr.color}`}
-                >
-                  <div className="overflow-hidden">
-                    <p className="text-xs font-semibold truncate text-slate-900 dark:text-white">
-                      {qr.role}
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {qr.email}
-                    </p>
-                  </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
-                </button>
-              ))}
+            {/* Dynamic Roles Info Callout */}
+            <div className="mt-4 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed flex items-start gap-2.5">
+              <Users className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-slate-700 dark:text-slate-300">
+                  Dynamic Role Provisioning:
+                </strong>{" "}
+                Teachers, Students, and Parents are dynamically created by the School Administrator. Once admitted or recruited, their accounts are immediately active.
+              </div>
             </div>
-            <p className="mt-2 text-center text-[11px] text-slate-400">
-              Default password for all seeded demo accounts is <span className="font-mono font-medium">password123</span>
-            </p>
           </div>
         </div>
       </div>

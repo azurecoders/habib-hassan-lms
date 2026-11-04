@@ -15,6 +15,8 @@ export async function GET() {
 
     const staff = await StaffProfile.find({ schoolId: session.schoolId })
       .populate("userId", "name email phone avatar isActive")
+      .populate("assignedClasses.classId", "name")
+      .populate("assignedClasses.subjectId", "name code")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -44,6 +46,7 @@ export async function POST(req: Request) {
       qualification,
       salary,
       phone,
+      avatarUrl,
     } = body;
 
     if (!name || !email || !employeeId || !designation) {
@@ -93,6 +96,7 @@ export async function POST(req: Request) {
       department: department || "General",
       qualification: qualification || "",
       salary: Number(salary) || 0,
+      avatarUrl: avatarUrl || "",
       status: "ACTIVE",
     });
 

@@ -11,6 +11,94 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
+    await connectToDatabase();
+
+    // Handling for Student and Parent personal attendance records
+    if (session.role === "STUDENT" || session.role === "PARENT") {
+      let student = null;
+      if (session.role === "STUDENT") {
+        student = await StudentProfile.findOne({ schoolId: session.schoolId, userId: session.id })
+          .populate("userId", "name")
+          .populate("classId", "name")
+          .lean();
+      } else {
+        student = await StudentProfile.findOne({ schoolId: session.schoolId, guardianId: session.id })
+          .populate("userId", "name")
+          .populate("classId", "name")
+          .lean();
+      }
+
+      if (!student) {
+        return NextResponse.json({
+          success: true,
+          isPersonalView: true,
+          student: null,
+          totalDays: 0,
+          presentDays: 0,
+          absentDays: 0,
+          lateDays: 0,
+          rate: 0,
+          records: [],
+        });
+      }
+
+      // Query all attendance sheets in this school and student's class
+      const sheets = await Attendance.find({
+        schoolId: session.schoolId,
+        classId: student.classId,
+        sectionName: student.sectionName,
+      })
+        .sort({ date: -1 })
+        .limit(60)
+        .lean();
+
+      let presentDays = 0;
+      let absentDays = 0;
+      let lateDays = 0;
+      const history = [];
+
+      for (const sheet of sheets) {
+        const myRecord = sheet.records.find(
+          (r) => r.studentId.toString() === student._id.toString()
+        );
+        if (myRecord) {
+          if (myRecord.status === "PRESENT") presentDays++;
+          else if (myRecord.status === "ABSENT") absentDays++;
+          else if (myRecord.status === "LATE") lateDays++;
+
+          history.push({
+            date: sheet.date,
+            status: myRecord.status,
+            remarks: myRecord.remarks || "",
+          });
+        }
+      }
+
+      const totalDays = presentDays + absentDays + lateDays;
+      const rate = totalDays > 0 ? Number(((presentDays / totalDays) * 100).toFixed(1)) : 0;
+
+      const userObj = student.userId as unknown as { name?: string };
+      const classObj = student.classId as unknown as { name?: string };
+
+      return NextResponse.json({
+        success: true,
+        isPersonalView: true,
+        student: {
+          name: userObj?.name || "Student",
+          className: classObj?.name || "Class",
+          sectionName: student.sectionName,
+          rollNumber: student.rollNumber,
+        },
+        totalDays,
+        presentDays,
+        absentDays,
+        lateDays,
+        rate,
+        records: history,
+      });
+    }
+
+    // Institution Admin & Teacher Class Roster View
     const { searchParams } = new URL(req.url);
     const classId = searchParams.get("classId");
     const sectionName = searchParams.get("sectionName") || "A";
@@ -19,8 +107,6 @@ export async function GET(req: Request) {
     if (!classId) {
       return NextResponse.json({ error: "classId is required" }, { status: 400 });
     }
-
-    await connectToDatabase();
 
     // 1. Fetch all active students in this class & section
     const students = await StudentProfile.find({
@@ -61,9 +147,12 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
+      isPersonalView: false,
       date,
+      classId,
+      sectionName,
       isMarked: !!attendanceDoc,
-      records: studentRecords,
+      students: studentRecords,
     });
   } catch (error: unknown) {
     console.error("Fetch attendance error:", error);
@@ -75,34 +164,27 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await getSession();
-    if (!session || !session.schoolId) {
+    if (
+      !session ||
+      !session.schoolId ||
+      (session.role !== "INSTITUTION_ADMIN" && session.role !== "TEACHER")
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    // Role check: Only institution admin or teacher can submit attendance
-    if (!["INSTITUTION_ADMIN", "TEACHER"].includes(session.role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await req.json();
     const { classId, sectionName, date, records } = body;
 
-    if (!classId || !sectionName || !date || !records) {
+    if (!classId || !sectionName || !date || !Array.isArray(records)) {
       return NextResponse.json(
-        { error: "classId, sectionName, date, and records are required" },
+        { error: "classId, sectionName, date, and student records are required" },
         { status: 400 }
       );
     }
 
     await connectToDatabase();
 
-    const formattedRecords = records.map((r: { studentId: string; status: string; remarks?: string }) => ({
-      studentId: r.studentId,
-      status: r.status || "PRESENT",
-      remarks: r.remarks || "",
-    }));
-
-    const attendance = await Attendance.findOneAndUpdate(
+    const updated = await Attendance.findOneAndUpdate(
       {
         schoolId: session.schoolId,
         classId,
@@ -114,20 +196,24 @@ export async function POST(req: Request) {
         classId,
         sectionName,
         date,
-        markedBy: session.id,
-        records: formattedRecords,
+        takenBy: session.id,
+        records: records.map((r: { studentId: string; status: string; remarks?: string }) => ({
+          studentId: r.studentId,
+          status: r.status,
+          remarks: r.remarks || "",
+        })),
       },
       { upsert: true, new: true }
     );
 
     return NextResponse.json({
       success: true,
-      message: "Attendance recorded successfully",
-      attendance,
+      message: "Attendance sheet submitted successfully",
+      attendance: updated,
     });
   } catch (error: unknown) {
     console.error("Save attendance error:", error);
-    const message = error instanceof Error ? error.message : "Failed to save attendance";
+    const message = error instanceof Error ? error.message : "Failed to record attendance";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
